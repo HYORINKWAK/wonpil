@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial="initial-scale=1.0">
+    <title>캄보디아 영농형 농업 시뮬레이션</title>
+    <style>
+        /* CSS: 게임 화면 스타일 꾸미기 */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* 화면 전체 높이 사용 */
+            margin: 0;
+            background-color: #f0f8ff; /* 연한 하늘색 배경 */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+            overflow: hidden; /* 스크롤바 생기지 않도록 */
+        }
+        #gameContainer {
+            position: relative; /* 자식 요소들 위치 조절 위해 */
+            text-align: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            overflow: hidden; /* 캔버스 밖으로 그림 안 튀어나오게 */
+            width: 840px; /* 캔버스 + 테두리 */
+        }
+        h1 {
+            color: #2e8b57;
+            margin-bottom: 15px;
+            font-size: 1.8em;
+        }
+        #gameCanvas {
+            border: 5px solid #4CAF50; /* 초록색 테두리 */
+            background-color: #aaddff; /* 캔버스 배경색 (하늘) */
+            display: block; /* 캔버스 아래 공백 제거 */
+        }
+        #statusDisplay {
+            margin-top: 15px;
+            font-size: 1.1em;
+            color: #555;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            padding: 10px 0;
+            background-color: #e6ffe6;
+            border-radius: 8px;
+        }
+        #statusDisplay p {
+            margin: 5px 10px;
+            font-weight: bold;
+        }
+        #messageDisplay {
+            margin-top: 10px;
+            font-size: 1.2em;
+            color: #d35400;
+            min-height: 30px; /* 메시지 공간 확보 */
+        }
+        .control-buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .control-buttons button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.0em;
+            margin: 8px;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .control-buttons button:hover {
+            background-color: #0056b3;
+            transform: translateY(-2px);
+        }
+        .control-buttons button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* 작물 선택 모달 */
+        #cropSelectionModal {
+            display: none; /* 초기에는 숨김 */
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 30px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .modal-content h2 {
+            color: #2e8b57;
+            margin-bottom: 20px;
+        }
+        .crop-options button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1em;
+            margin: 10px;
+            transition: background-color 0.3s ease;
+        }
+        .crop-options button:hover {
+            background-color: #45a049;
+        }
+
+        /* 업그레이드 모달 */
+        #upgradeModal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+        .upgrade-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 30px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .upgrade-content h2 {
+            color: #2e8b57;
+            margin-bottom: 20px;
+        }
+        .upgrade-options button {
+            background-color: #f44336;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 10px;
+            transition: background-color 0.3s ease;
+        }
+        .upgrade-options button:hover {
+            background-color: #da190b;
+        }
+        .upgrade-options button.available {
+            background-color: #008CBA;
+        }
+        .upgrade-options button.available:hover {
+            background-color: #0073a3;
+        }
+        .upgrade-options button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 게임 오버/승리 화면 스타일 */
+        #endScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 2em;
+            font-weight: bold;
+            z-index: 10;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            display: none; /* 초기에는 숨김 */
+        }
+        #endScreen img {
+            max-width: 80%;
+            max-height: 80%;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        #endScreen button {
+            background-color: #28a745;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.2em;
+            margin-top: 30px;
+            transition: background-color 0.3s ease;
+        }
+        #endScreen button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <h1>캄보디아 영농형 농업 시뮬레이션 🌱</h1>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="statusDisplay">
+            <p>자금: <span id="money">1000</span> 달러</p>
+            <p>수확량: <span id="yield">0</span></p>
+            <p>월: <span id="month">0</span></p>
+            <p id="waterStatus" style="display:none;">물: <span id="water">100</span></p>
+            <p id="solarStatus" style="display:none;">발전량: <span id="solar">0</span></p>
+            <p id="envStatus" style="display:none;">환경: <span id="envScore">0</span></p>
+            <p>작물: <span id="currentCrop">선택 안함</span></p>
+        </div>
+        <div id="messageDisplay">게임을 시작하려면 농업 방식을 선택해주세요!</div>
+        <div class="control-buttons">
+            <button id="chooseTraditionalBtn">전통 농업 시작</button>
+            <button id="chooseAgrivoltaicsBtn">영농형 태양광 농업 시작</button>
+            <button id="upgradeBtn" disabled>시설 업그레이드</button>
+            <button id="nextMonthBtn" disabled>다음 달 진행</button>
+        </div>
+
+        <!-- 작물 선택 모달 -->
+        <div id="cropSelectionModal">
+            <div class="modal-content">
+                <h2>이번 달에 심을 작물을 선택하세요!</h2>
+                <div class="crop-options">
+                    <button id="selectRice">쌀 (안정적, 물 많이 필요)</button>
+                    <button id="selectMango">망고 (고수익, 가뭄에 강함)</button>
+                    <button id="selectCassava">카사바 (저비용, 척박한 땅)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 업그레이드 모달 -->
+        <div id="upgradeModal">
+            <div class="upgrade-content">
+                <h2>시설 업그레이드</h2>
+                <div class="upgrade-options">
+                    <!-- 전통 농업 업그레이드 -->
+                    <button id="upgradeIrrigation" class="available">관개 시설 개선 (500 달러)</button>
+                    <!-- 영농형 농업 업그레이드 -->
+                    <button id="upgradeSolarPanel" class="available">태양광 패널 효율 증가 (700 달러)</button>
+                    <button id="closeUpgradeModal">닫기</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="endScreen">
+            <h2 id="endMessage"></h2>
+            <img id="endImage" src="" alt="게임 결과 이미지">
+            <button id="restartBtn">다시 시작!</button>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript: 게임 로직과 상호작용
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d'); // 캔버스에 그림을 그릴 도구
+
+        // UI 요소들
+        const moneyDisplay = document.getElementById('money');
+        const yieldDisplay = document.getElementById('yield');
+        const monthDisplay = document.getElementById('month');
+        const waterStatus = document.getElementById('waterStatus');
+        const waterDisplay = document.getElementById('water');
+        const solarStatus = document.getElementById('solarStatus');
+        const solarDisplay = document.getElementById('solar');
+        const envStatus = document.getElementById('envStatus');
+        const envScoreDisplay = document.getElementById('envScore');
+        const currentCropDisplay = document.getElementById('currentCrop');
+        const messageDisplay = document.getElementById('messageDisplay');
+
+        const chooseTraditionalBtn = document.getElementById('chooseTraditionalBtn');
+        const chooseAgrivoltaicsBtn = document.getElementById('chooseAgrivoltaicsBtn');
+        const upgradeBtn = document.getElementById('upgradeBtn');
+        const nextMonthBtn = document.getElementById('nextMonthBtn');
+
+        const cropSelectionModal = document.getElementById('cropSelectionModal');
+        const selectRiceBtn = document.getElementById('selectRice');
+        const selectMangoBtn = document.getElementById('selectMango');
+        const selectCassavaBtn = document.getElementById('selectCassava');
+
+        const upgradeModal = document.getElementById('upgradeModal');
+        const upgradeIrrigationBtn = document.getElementById('upgradeIrrigation');
+        const upgradeSolarPanelBtn = document.getElementById('upgradeSolarPanel');
+        const closeUpgradeModalBtn = document.getElementById('closeUpgradeModal');
+
+        const endScreen = document.getElementById('endScreen');
+        const endMessage = document.getElementById('endMessage');
+        const endImage = document.getElementById('endImage');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // 게임 변수 초기화
+        let game = {};
+
+        // 이미지 경로 정의 (말티쥬가 그린 그림들을 여기에 넣으면 돼!)
+        const imagePaths = {
+            bg_normal: 'images/bg_normal.png',
+            bg_drought: 'images/bg_drought.png',
+            bg_good_weather: 'images/bg_good_weather.png',
+            farm_traditional: 'images/farm_traditional.png',
+            farm_agrivoltaics: 'images/farm_agrivoltaics.png',
+            crop_healthy: 'images/crop_healthy.png',
+            crop_withered: 'images/crop_withered.png',
+            crop_rice: 'images/crop_rice.png', // 쌀 작물 그림
+            crop_mango: 'images/crop_mango.png', // 망고 작물 그림
+            crop_cassava: 'images/crop_cassava.png', // 카사바 작물 그림
+            upg_irrigation: 'images/upg_irrigation.png', // 관개 시설 업그레이드 그림
+            upg_solar: 'images/upg_solar.png', // 태양광 패널 업그레이드 그림
+            game_over_screen: 'images/game_over_screen.png',
+            victory_screen: 'images/victory_screen.png'
+        };
+        const images = {}; // 로드된 이미지 객체들을 저장할 곳
+
+        // 작물 정보
+        const crops = {
+            rice: { name: "쌀", waterNeed: 30, droughtResist: 0.8, basePrice: 10, yieldMod: 1.0, image: 'crop_rice' },
+            mango: { name: "망고", waterNeed: 15, droughtResist: 1.2, basePrice: 25, yieldMod: 0.7, image: 'crop_mango' },
+            cassava: { name: "카사바", waterNeed: 10, droughtResist: 1.5, basePrice: 8, yieldMod: 1.2, image: 'crop_cassava' }
+        };
+
+        // 게임 초기화 함수 (재시작 포함)
+        function initGame() {
+            game = {
+                farmType: null,
+                money: 1000,
+                currentMonth: 0,
+                cropYield: 0,
+                waterResource: 100, // 전통 농업용 물
+                solarEnergyGenerated: 0, // 영농형 태양광 발전량
+                environmentalScore: 0, // 영농형 태양광 환경 점수
+                isGameStarted: false,
+                gameEnded: false,
+                message: "게임을 시작하려면 농업 방식을 선택해주세요!",
+                currentBackground: images.bg_normal,
+                cropHealth: 1.0, // 작물 건강 상태 (0.0 ~ 1.0)
+                currentCrop: null, // 현재 심은 작물
+                upgrades: {
+                    irrigation: 0, // 0: 없음, 1: 1단계, 2: 2단계
+                    solarPanel: 0 // 0: 없음, 1: 1단계, 2: 2단계
+                }
+            };
+
+            // UI 초기화
+            moneyDisplay.textContent = game.money;
+            yieldDisplay.textContent = game.cropYield;
+            monthDisplay.textContent = game.currentMonth;
+            waterStatus.style.display = 'none';
+            solarStatus.style.display = 'none';
+            envStatus.style.display = 'none';
+            currentCropDisplay.textContent = game.currentCrop ? game.currentCrop.name : '선택 안함';
+            messageDisplay.textContent = game.message;
+
+            chooseTraditionalBtn.disabled = false;
+            chooseAgrivoltaicsBtn.disabled = false;
+            upgradeBtn.disabled = true; // 업그레이드 버튼 비활성화
+            nextMonthBtn.disabled = true;
+            endScreen.style.display = 'none'; // 게임 종료 화면 숨김
+
+            // 업그레이드 버튼 상태 초기화
+            upgradeIrrigationBtn.disabled = false;
+            upgradeIrrigationBtn.textContent = "관개 시설 개선 (500 달러)";
+            upgradeIrrigationBtn.classList.add('available');
+            upgradeSolarPanelBtn.disabled = false;
+            upgradeSolarPanelBtn.textContent = "태양광 패널 효율 증가 (700 달러)";
+            upgradeSolarPanelBtn.classList.add('available');
+            
+            drawGame(); // 초기 화면 그리기
+        }
+
+        // 이미지 로드 함수 (이미지 유무와 상관없이 게임 시작)
+        function loadImages() {
+            let loadedCount = 0;
+            const totalImages = Object.keys(imagePaths).length;
+
+            for (const key in imagePaths) {
+                images[key] = new Image();
+                images[key].src = imagePaths[key];
+                images[key].onload = () => {
+                    loadedCount++;
+                    if (loadedCount === totalImages) {
+                        console.log("모든 이미지가 로드되었습니다.");
+                        initGame(); // 모든 이미지 로드 후 게임 초기화
+                    }
+                    drawGame(); // 이미지가 로드되면 바로 화면 업데이트
+                };
+                images[key].onerror = () => {
+                    console.error(`이미지 로드 실패: ${imagePaths[key]}. 해당 이미지는 표시되지 않을 수 있습니다.`);
+                    loadedCount++;
+                    if (loadedCount === totalImages) {
+                        initGame();
+                    }
+                    drawGame(); // 에러 발생 시에도 화면 업데이트
+                };
+            }
+            // 만약 이미지가 하나도 없거나 경로가 잘못되어 로드 카운트가 0일 경우 바로 시작
+            if (totalImages === 0) {
+                initGame();
+            }
+        }
+
+        // 게임 화면 그리기 함수
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // 화면 지우기
+
+            // 배경 그리기
+            if (game.currentBackground && game.currentBackground.complete && game.currentBackground.naturalWidth > 0) {
+                ctx.drawImage(game.currentBackground, 0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#87CEEB'; // 기본 하늘색 배경
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'black';
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('배경 이미지 없음', canvas.width / 2, canvas.height / 2 - 100);
+            }
+            
+            // 농장 이미지 그리기 (배경 위에)
+            let farmImageToDraw = null;
+            if (game.farmType === 'traditional' && images.farm_traditional && images.farm_traditional.complete && images.farm_traditional.naturalWidth > 0) {
+                farmImageToDraw = images.farm_traditional;
+            } else if (game.farmType === 'agrivoltaics' && images.farm_agrivoltaics && images.farm_agrivoltaics.complete && images.farm_agrivoltaics.naturalWidth > 0) {
+                farmImageToDraw = images.farm_agrivoltaics;
+            }
+
+            if (farmImageToDraw) {
+                ctx.drawImage(farmImageToDraw, canvas.width * 0.1, canvas.height * 0.2, canvas.width * 0.8, canvas.height * 0.6);
+            } else if (game.farmType) {
+                ctx.fillStyle = game.farmType === 'agrivoltaics' ? 'rgba(0,128,0,0.7)' : 'rgba(139,69,19,0.7)';
+                ctx.fillRect(canvas.width * 0.2, canvas.height * 0.3, canvas.width * 0.6, canvas.height * 0.4);
+                ctx.fillStyle = 'white';
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(game.farmType === 'agrivoltaics' ? '영농형 농장 (그림X)' : '전통 농장 (그림X)', canvas.width / 2, canvas.height / 2);
+            }
+
+            // 작물 상태 그리기 (농장 이미지 위에)
+            let cropImageToDraw = null;
+            if (game.currentCrop && images[game.currentCrop.image] && images[game.currentCrop.image].complete && images[game.currentCrop.image].naturalWidth > 0) {
+                cropImageToDraw = images[game.currentCrop.image];
+            } else if (game.cropHealth > 0.5 && images.crop_healthy && images.crop_healthy.complete && images.crop_healthy.naturalWidth > 0) {
+                cropImageToDraw = images.crop_healthy;
+            } else if (game.cropHealth <= 0.5 && images.crop_withered && images.crop_withered.complete && images.crop_withered.naturalWidth > 0) {
+                cropImageToDraw = images.crop_withered;
+            }
+
+            if (cropImageToDraw && game.farmType) {
+                ctx.drawImage(cropImageToDraw, canvas.width * 0.3, canvas.height * 0.5, canvas.width * 0.4, canvas.height * 0.3);
+            } else if (game.farmType) {
+                ctx.fillStyle = game.cropHealth > 0.5 ? 'rgba(0,255,0,0.5)' : 'rgba(255,165,0,0.5)';
+                ctx.fillRect(canvas.width * 0.35, canvas.height * 0.55, canvas.width * 0.3, canvas.height * 0.2);
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('작물 (그림X)', canvas.width / 2, canvas.height * 0.65);
+            }
+
+            // 업그레이드 시설 그리기 (선택사항, 그림 있으면)
+            if (game.upgrades.irrigation > 0 && images.upg_irrigation && images.upg_irrigation.complete && images.upg_irrigation.naturalWidth > 0) {
+                ctx.drawImage(images.upg_irrigation, canvas.width * 0.7, canvas.height * 0.4, canvas.width * 0.15, canvas.height * 0.2);
+            }
+            if (game.upgrades.solarPanel > 0 && images.upg_solar && images.upg_solar.complete && images.upg_solar.naturalWidth > 0) {
+                ctx.drawImage(images.upg_solar, canvas.width * 0.15, canvas.height * 0.1, canvas.width * 0.2, canvas.height * 0.15);
+            }
+
+
+            // 게임 상태 업데이트 (UI)
+            moneyDisplay.textContent = game.money.toFixed(0);
+            yieldDisplay.textContent = game.cropYield.toFixed(0);
+            monthDisplay.textContent = game.currentMonth;
+            currentCropDisplay.textContent = game.currentCrop ? game.currentCrop.name : '선택 안함';
+            messageDisplay.textContent = game.message;
+
+            if (game.farmType === 'traditional') {
+                waterStatus.style.display = 'block';
+                waterDisplay.textContent = game.waterResource.toFixed(0);
+                solarStatus.style.display = 'none';
+                envStatus.style.display = 'none';
+            } else if (game.farmType === 'agrivoltaics') {
+                waterStatus.style.display = 'none';
+                solarStatus.style.display = 'block';
+                solarDisplay.textContent = game.solarEnergyGenerated.toFixed(0);
+                envStatus.style.display = 'block';
+                envScoreDisplay.textContent = game.environmentalScore.toFixed(0);
+            }
+        }
+
+        // 농업 방식 선택 함수
+        function chooseFarmType(type) {
+            if (game.isGameStarted || game.gameEnded) return;
+
+            game.farmType = type;
+            game.isGameStarted = true;
+            nextMonthBtn.disabled = false;
+            upgradeBtn.disabled = false; // 업그레이드 버튼 활성화
+            chooseTraditionalBtn.disabled = true;
+            chooseAgrivoltaicsBtn.disabled = true;
+
+            if (type === 'agrivoltaics') {
+                game.money -= 500; // 초기 설치 비용
+                game.message = '✨ 영농형 태양광 농업을 시작합니다! 초기 비용 500 달러가 지출됩니다.';
+            } else {
+                game.message = '🌾 전통 농업을 시작합니다.';
+            }
+            drawGame();
+            showCropSelectionModal(); // 작물 선택 모달 띄우기
+        }
+
+        // 작물 선택 모달 표시
+        function showCropSelectionModal() {
+            cropSelectionModal.style.display = 'flex';
+            nextMonthBtn.disabled = true; // 작물 선택 전까지 다음 달 진행 불가
+            upgradeBtn.disabled = true; // 작물 선택 전까지 업그레이드 불가
+        }
+
+        // 작물 선택 처리
+        function selectCrop(cropKey) {
+            game.currentCrop = crops[cropKey];
+            cropSelectionModal.style.display = 'none';
+            nextMonthBtn.disabled = false;
+            upgradeBtn.disabled = false;
+            game.message = `${game.currentCrop.name}을(를) 심었습니다.`;
+            drawGame();
+        }
+
+        // 다음 달 진행 함수 (핵심 게임 로직)
+        function nextMonth() {
+            if (!game.isGameStarted || game.gameEnded || !game.currentCrop) {
+                if (!game.isGameStarted) messageDisplay.textContent = '먼저 농업 방식을 선택해주세요!';
+                else if (!game.currentCrop) messageDisplay.textContent = '이번 달에 심을 작물을 선택해주세요!';
+                return;
+            }
+
+            game.currentMonth++;
+            let cropYieldModifier = 1.0;
+            game.cropHealth = 1.0;
+            game.currentBackground = images.bg_normal; // 배경 초기화
+
+            // 1. 이벤트 발생
+            const randomEvent = Math.random();
+            if (randomEvent < 0.25) { // 25% 확률로 가뭄
+                game.message = "💧 가뭄이 찾아왔습니다...";
+                game.currentBackground = images.bg_drought;
+                let droughtEffect = 1.0;
+                if (game.farmType === 'traditional') {
+                    game.waterResource -= (50 - game.upgrades.irrigation * 10); // 관개 시설 업그레이드 시 물 소모 감소
+                    droughtEffect = 0.4 + (game.upgrades.irrigation * 0.2); // 업그레이드 시 가뭄 피해 완화
+                    game.message += ` 전통 농업은 물 부족으로 수확량이 크게 줄어듭니다. (관개시설 레벨: ${game.upgrades.irrigation})`;
+                } else if (game.farmType === 'agrivoltaics') {
+                    game.waterResource += 20; // 태양광 펌프로 물 보충 (예시)
+                    droughtEffect = 0.7;
+                    game.solarEnergyGenerated += (30 + game.upgrades.solarPanel * 10); // 업그레이드 시 발전량 증가
+                    game.message += ` 영농형 태양광은 태양광 펌프로 물 부족을 어느 정도 극복합니다! (태양광 패널 레벨: ${game.upgrades.solarPanel})`;
+                }
+                cropYieldModifier *= droughtEffect * game.currentCrop.droughtResist; // 작물별 가뭄 저항력 적용
+                game.cropHealth *= droughtEffect;
+
+            } else if (randomEvent < 0.5) { // 25% 확률로 좋은 날씨
+                game.message = "☀️ 날씨가 아주 좋습니다!";
+                game.currentBackground = images.bg_good_weather;
+                cropYieldModifier *= 1.3;
+                game.cropHealth *= 1.2;
+                if (game.farmType === 'agrivoltaics') {
+                    game.solarEnergyGenerated += (60 + game.upgrades.solarPanel * 20); // 업그레이드 시 발전량 증가
+                    game.message += ` 영농형 태양광은 발전량도 늘어납니다! (태양광 패널 레벨: ${game.upgrades.solarPanel})`;
+                }
+            } else if (randomEvent < 0.75) { // 25% 확률로 시장 호황
+                game.message = "💰 농산물 시장 가격이 폭등했습니다!";
+                game.isMarketBoom = true;
+            } else { // 25% 확률로 평범
+                game.message = "🌱 평범한 한 달입니다.";
+            }
+
+            // 2. 작물 재배 및 수확
+            let baseYield = 80 + (Math.random() * 40);
+            let harvestedCrop = baseYield * cropYieldModifier * game.cropHealth * game.currentCrop.yieldMod;
+
+            if (game.farmType === 'traditional') {
+                game.waterResource -= game.currentCrop.waterNeed - (game.upgrades.irrigation * 5); // 작물별 물 요구량 및 업그레이드 효과
+                if (game.waterResource < 0) {
+                    game.waterResource = 0;
+                    game.message += "\n🚨 물 자원이 바닥났습니다! 작물 성장에 치명적입니다.";
+                    harvestedCrop *= 0.2;
+                    game.cropHealth = 0.1;
+                }
+            }
+            game.cropYield = harvestedCrop;
+
+            // 3. 작물 판매
+            let pricePerUnit = game.currentCrop.basePrice;
+            if (game.isMarketBoom) {
+                pricePerUnit *= 1.8;
+                game.isMarketBoom = false;
+            }
+            let income = harvestedCrop * pricePerUnit;
+            game.money += income;
+            game.message += `\n ${harvestedCrop.toFixed(0)}만큼 수확하여 ${income.toFixed(0)} 달러를 벌었습니다.`;
+
+
+            // 4. 영농형 태양광 추가 수입 및 환경 점수
+            if (game.farmType === 'agrivoltaics') {
+                let solarIncome = game.solarEnergyGenerated * 5;
+                game.money += solarIncome;
+                game.environmentalScore += game.solarEnergyGenerated * 0.1;
+                game.message += `\n 태양광 발전으로 ${solarIncome.toFixed(0)} 달러의 추가 수입을 얻었습니다. (환경 점수: ${game.environmentalScore.toFixed(0)})`;
+                game.solarEnergyGenerated = 0;
+            }
+
+            // 5. 게임 종료 조건 확인
+            checkGameEndConditions();
+
+            // 6. 화면 업데이트
+            drawGame();
+            if (!game.gameEnded) {
+                showCropSelectionModal(); // 다음 달 작물 선택 모달 다시 띄우기
+            }
+        }
+
+        // 업그레이드 모달 표시
+        function showUpgradeModal() {
+            upgradeModal.style.display = 'flex';
+            // 업그레이드 버튼 상태 업데이트
+            if (game.farmType === 'traditional') {
+                upgradeSolarPanelBtn.style.display = 'none';
+                upgradeIrrigationBtn.style.display = 'block';
+                if (game.upgrades.irrigation >= 2) {
+                    upgradeIrrigationBtn.disabled = true;
+                    upgradeIrrigationBtn.textContent = "관개 시설 (최대 레벨)";
+                    upgradeIrrigationBtn.classList.remove('available');
+                } else if (game.money < 500) {
+                    upgradeIrrigationBtn.disabled = true;
+                    upgradeIrrigationBtn.textContent = `관개 시설 개선 (500 달러) - 자금 부족!`;
+                    upgradeIrrigationBtn.classList.remove('available');
+                } else {
+                    upgradeIrrigationBtn.disabled = false;
+                    upgradeIrrigationBtn.textContent = `관개 시설 개선 (500 달러)`;
+                    upgradeIrrigationBtn.classList.add('available');
+                }
+            } else if (game.farmType === 'agrivoltaics') {
+                upgradeIrrigationBtn.style.display = 'none';
+                upgradeSolarPanelBtn.style.display = 'block';
+                if (game.upgrades.solarPanel >= 2) {
+                    upgradeSolarPanelBtn.disabled = true;
+                    upgradeSolarPanelBtn.textContent = "태양광 패널 (최대 레벨)";
+                    upgradeSolarPanelBtn.classList.remove('available');
+                } else if (game.money < 700) {
+                    upgradeSolarPanelBtn.disabled = true;
+                    upgradeSolarPanelBtn.textContent = `태양광 패널 효율 증가 (700 달러) - 자금 부족!`;
+                    upgradeSolarPanelBtn.classList.remove('available');
+                } else {
+                    upgradeSolarPanelBtn.disabled = false;
+                    upgradeSolarPanelBtn.textContent = `태양광 패널 효율 증가 (700 달러)`;
+                    upgradeSolarPanelBtn.classList.add('available');
+                }
+            }
+        }
+
+        // 업그레이드 처리
+        function performUpgrade(type) {
+            if (type === 'irrigation' && game.money >= 500 && game.upgrades.irrigation < 2) {
+                game.money -= 500;
+                game.upgrades.irrigation++;
+                game.message = `관개 시설이 레벨 ${game.upgrades.irrigation}으로 업그레이드되었습니다!`;
+            } else if (type === 'solarPanel' && game.money >= 700 && game.upgrades.solarPanel < 2) {
+                game.money -= 700;
+                game.upgrades.solarPanel++;
+                game.message = `태양광 패널 효율이 레벨 ${game.upgrades.solarPanel}으로 업그레이드되었습니다!`;
+            } else {
+                game.message = "업그레이드할 수 없습니다. (자금 부족 또는 최대 레벨)";
+            }
+            drawGame();
+            showUpgradeModal(); // 모달 상태 업데이트를 위해 다시 표시
+        }
+
+        // 게임 종료 조건 확인 함수
+        function checkGameEndConditions() {
+            if (game.gameEnded) return;
+
+            let endReason = "";
+            let endImageSrc = "";
+            
+            // 게임 오버 조건
+            if (game.money <= 0) {
+                endReason = "자금이 바닥났습니다! 농장을 유지할 수 없어요. ㅠㅠ";
+                endImageSrc = images.game_over_screen ? images.game_over_screen.src : '';
+            } else if (game.farmType === 'traditional' && game.waterResource <= 0 && game.currentMonth >= 3) {
+                endReason = "물 자원이 완전히 고갈되어 더 이상 농사를 지을 수 없습니다. ㅠㅠ";
+                endImageSrc = images.game_over_screen ? images.game_over_screen.src : '';
+            } else if (game.currentMonth >= 12) { // 12개월 플레이 후 최종 결과
+                if (game.farmType === 'agrivoltaics') {
+                    if (game.money >= 4000 && game.environmentalScore >= 150 && game.upgrades.solarPanel >= 1) {
+                        endReason = "축하합니다! 영농형 태양광 농업으로 큰 수익과 환경 보호에 성공했습니다! 🎉";
+                        endImageSrc = images.victory_screen ? images.victory_screen.src : '';
+                    } else if (game.money >= 2500) {
+                         endReason = "영농형 태양광 농업으로 안정적인 수익을 올렸습니다!👍";
+                         endImageSrc = images.victory_screen ? images.victory_screen.src : '';
+                    } else {
+                        endReason = "1년이 지났습니다. 영농형 태양광 농업은 아직 안정화 단계입니다.";
+                        endImageSrc = images.game_over_screen ? images.game_over_screen.src : '';
+                    }
+                } else { // 전통 농업
+                    if (game.money >= 2500 && game.upgrades.irrigation >= 1) {
+                        endReason = "축하합니다! 전통 농업으로 성공적인 한 해를 보냈습니다! 🎉";
+                        endImageSrc = images.victory_screen ? images.victory_screen.src : '';
+                    } else {
+                        endReason = "1년이 지났습니다. 전통 농업은 여전히 어려움이 많습니다.";
+                        endImageSrc = images.game_over_screen ? images.game_over_screen.src : '';
+                    }
+                }
+            }
+
+            // 게임 종료 처리
+            if (endReason !== "") {
+                game.gameEnded = true;
+                nextMonthBtn.disabled = true;
+                upgradeBtn.disabled = true;
+                chooseTraditionalBtn.disabled = true;
+                chooseAgrivoltaicsBtn.disabled = true;
+
+                endMessage.textContent = endReason;
+                endImage.src = endImageSrc;
+                if (!endImageSrc || !images[endImageSrc.split('/').pop().split('.')[0].replace('game_over_screen', 'game_over_screen').replace('victory_screen', 'victory_screen')]) {
+                    endImage.style.display = 'none';
+                } else {
+                    endImage.style.display = 'block';
+                }
+                endScreen.style.display = 'flex';
+            }
+        }
+
+        // 이벤트 리스너 (버튼 클릭 시 함수 실행)
+        chooseTraditionalBtn.addEventListener('click', () => chooseFarmType('traditional'));
+        chooseAgrivoltaicsBtn.addEventListener('click', () => chooseFarmType('agrivoltaics'));
+        nextMonthBtn.addEventListener('click', nextMonth);
+        upgradeBtn.addEventListener('click', showUpgradeModal);
+        restartBtn.addEventListener('click', initGame);
+
+        selectRiceBtn.addEventListener('click', () => selectCrop('rice'));
+        selectMangoBtn.addEventListener('click', () => selectCrop('mango'));
+        selectCassavaBtn.addEventListener('click', () => selectCrop('cassava'));
+
+        upgradeIrrigationBtn.addEventListener('click', () => performUpgrade('irrigation'));
+        upgradeSolarPanelBtn.addEventListener('click', () => performUpgrade('solarPanel'));
+        closeUpgradeModalBtn.addEventListener('click', () => upgradeModal.style.display = 'none');
+
+        // 모든 이미지 로드 시작
+        loadImages();
+        // 이미지 로드와 별개로 게임 바로 초기화 및 시작 (이미지가 없어도 작동)
+        // initGame(); // loadImages에서 호출하므로 여기서는 주석 처리
+    </script>
+</body>
+</html>
